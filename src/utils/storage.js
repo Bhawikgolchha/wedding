@@ -1,9 +1,7 @@
 import imageCompression from 'browser-image-compression';
 
-// Dynamically use the same hostname as the page.
-// This makes it work on localhost AND when guests scan the QR code from their phones on the LAN.
-const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-const API_BASE_URL = `http://${hostname}:3001/api`;
+// Rely on Vite's proxy resolving /api locally during dev
+const API_BASE_URL = `/api`;
 
 /**
  * Gets or creates a unique guest ID to identify uploads
@@ -101,5 +99,7 @@ export async function deleteImage(imageId) {
  * Get full image URL from a relative db path
  */
 export function getImageUrl(urlPath) {
-  return `http://localhost:3001${urlPath}`;
+  // urlPath already comes from the backend as '/uploads/filename.ext'
+  // Vite proxy will route this request back to the server
+  return urlPath;
 }

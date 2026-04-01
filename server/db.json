@@ -102,5 +102,13 @@
     "size": 407253,
     "timestamp": 1775032464276,
     "guestId": "guest_1775032196405_fratmm5hf"
+  },
+  {
+    "id": "image-1775035158475-114956139.png",
+    "url": "/uploads/image-1775035158475-114956139.png",
+    "name": "dummy.png",
+    "size": 68,
+    "timestamp": 1775035158480,
+    "guestId": "tester123"
   }
 ]
