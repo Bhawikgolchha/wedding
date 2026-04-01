@@ -1,7 +1,15 @@
 import imageCompression from 'browser-image-compression';
 
-// Rely on Vite's proxy resolving /api locally during dev
-const API_BASE_URL = `/api`;
+// In production (Vercel), VITE_API_URL must be set to the deployed backend URL.
+// In local dev, falls back to the same LAN hostname on port 3001 so phones on
+// the same WiFi can reach the backend when scanning the QR code.
+const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+const API_BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : `http://${hostname}:3001/api`;
+
+// Derive the backend root from the same source so image URLs are always correct
+const BACKEND_ROOT = import.meta.env.VITE_API_URL || `http://${hostname}:3001`;
 
 /**
  * Gets or creates a unique guest ID to identify uploads
@@ -96,10 +104,10 @@ export async function deleteImage(imageId) {
 }
 
 /**
- * Get full image URL from a relative db path
+ * Get full image URL from a relative db path like '/uploads/filename.ext'
  */
 export function getImageUrl(urlPath) {
-  // urlPath already comes from the backend as '/uploads/filename.ext'
-  // Vite proxy will route this request back to the server
-  return urlPath;
+  // In production, prepend the deployed backend URL.
+  // In local dev, prepend the LAN IP so phones can load images after uploading.
+  return `${BACKEND_ROOT}${urlPath}`;
 }
