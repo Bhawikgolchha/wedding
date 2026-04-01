@@ -3,6 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -136,6 +137,18 @@ app.delete('/api/images/:id', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Global backend server running on http://localhost:${PORT}`);
+// Listen on 0.0.0.0 so phones on the same WiFi can reach the backend.
+// When a guest scans the QR code, their phone uses the machine's LAN IP — not localhost.
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n✅ Backend server running:`);
+  console.log(`   Local:   http://localhost:${PORT}`);
+  const nets = os.networkInterfaces();
+  for (const ifaces of Object.values(nets)) {
+    for (const iface of ifaces) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        console.log(`   Network: http://${iface.address}:${PORT}  ← Share this IP with guests`);
+      }
+    }
+  }
+  console.log();
 });

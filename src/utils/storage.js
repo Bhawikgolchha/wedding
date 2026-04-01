@@ -1,6 +1,9 @@
 import imageCompression from 'browser-image-compression';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+// Dynamically use the same hostname as the page.
+// This makes it work on localhost AND when guests scan the QR code from their phones on the LAN.
+const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+const API_BASE_URL = `http://${hostname}:3001/api`;
 
 /**
  * Gets or creates a unique guest ID to identify uploads

@@ -53,8 +53,13 @@ export default function Gallery() {
       // Update gallery instantly
       setImages(prev => [...newlySaved, ...prev].sort((a, b) => b.timestamp - a.timestamp));
     } catch (err) {
-      console.error(err);
-      setErrorMsg('Failed to process image. Make sure the backend server is running.');
+      console.error('Upload error:', err);
+      const msg = err?.message || 'Unknown error';
+      if (msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
+        setErrorMsg('Cannot reach the server. Make sure the backend is running on port 3001.');
+      } else {
+        setErrorMsg(`Upload failed: ${msg}`);
+      }
     } finally {
       setIsUploading(false);
       setTimeout(() => setErrorMsg(''), 4000);
