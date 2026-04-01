@@ -1,15 +1,5 @@
 import imageCompression from 'browser-image-compression';
-
-// In production (Vercel), VITE_API_URL must be set to the deployed backend URL.
-// In local dev, falls back to the same LAN hostname on port 3001 so phones on
-// the same WiFi can reach the backend when scanning the QR code.
-const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-const API_BASE_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : `http://${hostname}:3001/api`;
-
-// Derive the backend root from the same source so image URLs are always correct
-const BACKEND_ROOT = import.meta.env.VITE_API_URL || `http://${hostname}:3001`;
+import { supabase } from './supabase';
 
 /**
  * Gets or creates a unique guest ID to identify uploads
@@ -24,7 +14,7 @@ export function getGuestId() {
 }
 
 /**
- * Compress and upload an image
+ * Compress and upload an image to Supabase
  * @param {File} file 
  */
 export async function saveImage(file) {
@@ -38,24 +28,42 @@ export async function saveImage(file) {
     // Compress the file
     const compressedFile = await imageCompression(file, options);
     
-    // Create form data
-    const formData = new FormData();
-    // We send the compressed file, keeping the original file name
-    formData.append('image', compressedFile, file.name);
-    // Include the uploader's unique identity
-    formData.append('guestId', getGuestId());
+    const guestId = getGuestId();
+    const timestamp = Date.now();
+    // Use a unique file name
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${timestamp}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${guestId}/${fileName}`;
 
-    const response = await fetch(`${API_BASE_URL}/upload`, {
-      method: 'POST',
-      body: formData
-    });
+    // 1. Upload the image to Supabase Storage 'gallery' bucket
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('gallery')
+      .upload(filePath, compressedFile, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Failed to upload');
-    }
+    if (uploadError) throw new Error(uploadError.message);
 
-    return await response.json();
+    // 2. Insert metadata into the 'images' table
+    const dbEntry = {
+      id: uploadData.path, // We use the storage path as a unique ID
+      url: uploadData.path, // This maps to the storage path
+      name: file.name,
+      size: compressedFile.size,
+      timestamp: timestamp,
+      guestId: guestId
+    };
+
+    const { data: dbData, error: dbError } = await supabase
+      .from('images')
+      .insert([dbEntry])
+      .select();
+
+    if (dbError) throw new Error(dbError.message);
+
+    return dbData[0];
   } catch (error) {
     console.error('Error uploading image:', error);
     throw error;
@@ -63,15 +71,18 @@ export async function saveImage(file) {
 }
 
 /**
- * Retrieve all global images from Server
+ * Retrieve all global images from Supabase
  */
 export async function getImages() {
   try {
-    const response = await fetch(`${API_BASE_URL}/images`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch images');
-    }
-    return await response.json();
+    const { data, error } = await supabase
+      .from('images')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    
+    return data || [];
   } catch (error) {
     console.error('Error fetching images:', error);
     return [];
@@ -83,20 +94,24 @@ export async function getImages() {
  */
 export async function deleteImage(imageId) {
   try {
-    const response = await fetch(`${API_BASE_URL}/images/${imageId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ guestId: getGuestId() })
-    });
+    // 1. Delete from storage bucket
+    const { error: storageError } = await supabase
+      .storage
+      .from('gallery')
+      .remove([imageId]);
+      
+    if (storageError) throw new Error(storageError.message);
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Failed to delete');
-    }
+    // 2. Delete from database table
+    const { error: dbError } = await supabase
+      .from('images')
+      .delete()
+      .eq('id', imageId)
+      .eq('guestId', getGuestId()); // Only let the uploading guest delete it
 
-    return await response.json();
+    if (dbError) throw new Error(dbError.message);
+
+    return { success: true };
   } catch (error) {
     console.error('Error deleting image:', error);
     throw error;
@@ -104,10 +119,11 @@ export async function deleteImage(imageId) {
 }
 
 /**
- * Get full image URL from a relative db path like '/uploads/filename.ext'
+ * Get full image URL from a relative db path
  */
 export function getImageUrl(urlPath) {
-  // In production, prepend the deployed backend URL.
-  // In local dev, prepend the LAN IP so phones can load images after uploading.
-  return `${BACKEND_ROOT}${urlPath}`;
+  if (!urlPath) return '';
+  // Convert the relative path into a full public URL from the Supabase bucket
+  const { data } = supabase.storage.from('gallery').getPublicUrl(urlPath);
+  return data.publicUrl;
 }

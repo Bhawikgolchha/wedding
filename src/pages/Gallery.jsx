@@ -56,7 +56,7 @@ export default function Gallery() {
       console.error('Upload error:', err);
       const msg = err?.message || 'Unknown error';
       if (msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')) {
-        setErrorMsg('Cannot reach the server. Make sure the backend is running on port 3001.');
+        setErrorMsg('Network error. Please check your internet connection.');
       } else {
         setErrorMsg(`Upload failed: ${msg}`);
       }
