@@ -8,10 +8,11 @@ export default function Landing() {
   const [galleryUrl, setGalleryUrl] = useState('');
 
   useEffect(() => {
-    // Dynamically get the current origin to generate the QR code
-    // In a real scenario, this would point to the production URL.
-    const currentOrigin = window.location.origin;
-    setGalleryUrl(`${currentOrigin}/gallery`);
+    // Use the production URL from env variable so the QR code 
+    // always works for guests, even when viewed from localhost
+    const productionUrl = import.meta.env.VITE_APP_URL;
+    const origin = productionUrl || window.location.origin;
+    setGalleryUrl(`${origin}/gallery`);
   }, []);
 
   return (
